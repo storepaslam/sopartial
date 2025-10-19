@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Inventori Paslam</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Library untuk QR Code (kotak) -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <!-- Library untuk Barcode (batang) -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">Paslam Inventory</div>
+                <div class="nav-links">
+                    <a href="#" class="active">Inventori</a>
+                    <a href="#">Laporan</a>
+                    <a href="#">Pengaturan</a>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="section">
+            <h1>Inventori Paslam</h1>
+            <p>Upload data Excel dan scan barang untuk membandingkan stok</p>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            
+            <div class="status-container">
+                <span class="status-indicator status-pending"></span>
+                <span id="statusText">Siap untuk upload data Excel</span>
+            </div>
+        </div>
+        
+        <div class="section" id="uploadSection">
+            <h2>1. Upload Data Excel</h2>
+            <p>Upload file Excel yang berisi data inventori Paslam hari ini dengan struktur:</p>
+            <p><strong>Judul Produk | Toko | Nomor SKU | Barcode | Unit dalam Persediaan</strong></p>
+            
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls, .csv">
+                <label for="fileInput" class="file-label">Pilih File Excel</label>
+                <p>Atau seret file ke sini</p>
+                <p id="fileName">Belum ada file yang dipilih</p>
+            </div>
+            
+            <div id="filePreview" class="file-preview hidden">
+                <h3>Preview Data Excel:</h3>
+                <div class="table-container">
+                    <table id="previewTable">
+                        <thead>
+                            <tr>
+                                <th>Judul Produk</th>
+                                <th>Toko</th>
+                                <th>Nomor SKU</th>
+                                <th>Barcode</th>
+                                <th>Unit dalam Persediaan</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" id="processBtn" disabled>Proses Data Excel</button>
+        </div>
+        
+        <div class="section hidden" id="scanSection">
+            <h2>2. Scan Barang</h2>
+            <p>Scan atau masukkan kode SKU/Barcode barang untuk memulai proses inventori</p>
+            
+            <div class="stats-container">
+                <div class="stat-item">
+                    <span class="stat-label">Total Produk:</span>
+                    <span class="stat-value" id="totalProducts">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Terscan:</span>
+                    <span class="stat-value" id="scannedCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Dengan Barcode:</span>
+                    <span class="stat-value" id="barcodeCount">0</span>
+                </div>
+            </div>
+            
+            <div class="scan-section">
+                <div class="scan-input-container">
+                    <input type="text" class="scan-input" id="scanInput" placeholder="Scan barcode atau masukkan kode SKU">
+                    <button class="scan-icon-btn" id="scanIconBtn" type="button" title="Scan Barcode">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 7h2m18 0h2M1 12h22M1 17h2m18 0h2M7 1v2m10-2v2M7 23v-2m10 0v2M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/>
+                        </svg>
+                    </button>
+                    <div class="suggestions-box hidden" id="suggestionsBox"></div>
+                </div>
+                <button class="btn btn-primary" id="scanBtn">Tambah Barang</button>
+            </div>
+
+            <div id="scanModal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Scan Barcode</h3>
+                        <button class="close-btn" id="closeModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="scanner-type-selector">
+                            <label class="scanner-option">
+                                <input type="radio" name="scannerType" value="barcode" checked>
+                                <span>Barcode (Batang)</span>
+                            </label>
+                            <label class="scanner-option">
+                                <input type="radio" name="scannerType" value="qr">
+                                <span>QR Code (Kotak)</span>
+                            </label>
+                        </div>
+                        
+                        <div id="scanArea">
+                            <video id="qrVideo" width="100%" height="300"></video>
+                            <canvas id="qrCanvas" class="hidden"></canvas>
+                            <div id="barcodeScanner" class="hidden"></div>
+                        </div>
+                        <div class="scan-controls">
+                            <button class="btn btn-primary" id="startScan">Mulai Scan</button>
+                            <button class="btn btn-danger" id="stopScan" disabled>Stop Scan</button>
+                        </div>
+                        <div id="scanResult" class="scan-result"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="auto-scan-info">
+                <span class="status-indicator status-pending"></span>
+                <span id="autoScanStatus">Auto-scan aktif. Scan barcode atau ketik SKU lengkap</span>
+            </div>
+            
+            <div class="product-list" id="productList"></div>
+            
+            <button class="btn btn-success" id="compareBtn" disabled>Bandingkan Stok</button>
+        </div>
+        
+        <div class="section hidden" id="comparisonSection">
+            <h2>3. Perbandingan Stok</h2>
+            <p>Perbandingan antara stok di sistem dengan hasil scan fisik</p>
+            
+            <div class="summary-stats">
+                <div class="summary-item">
+                    <span class="summary-label">Total Selisih:</span>
+                    <span class="summary-value" id="totalDifference">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Barang Lebih:</span>
+                    <span class="summary-value positive" id="overstockCount">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Barang Kurang:</span>
+                    <span class="summary-value negative" id="understockCount">0</span>
+                </div>
+            </div>
+            
+            <div class="comparison-section">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Judul Produk</th>
+                            <th>Nomor SKU</th>
+                            <th>Stok Sistem</th>
+                            <th>Stok Fisik</th>
+                            <th>Selisih</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparisonBody"></tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="exportBtn">Export Laporan</button>
+                <button class="btn" id="resetBtn">Mulai Ulang</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
