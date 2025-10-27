@@ -464,13 +464,22 @@ function findProductBySKUOrBarcode(searchValue) {
     return product;
 }
 
+// ==================== FUNGSI YANG DIUPDATE ====================
+
 function addProductToScanned(product) {
     const existingIndex = scannedProducts.findIndex(item => item.sku === product.sku);
     
     if (existingIndex !== -1) {
+        // Jika produk sudah ada, tingkatkan jumlah dan pindahkan ke atas
         scannedProducts[existingIndex].scannedCount += 1;
+        
+        // Pindahkan produk ke paling atas
+        const existingProduct = scannedProducts[existingIndex];
+        scannedProducts.splice(existingIndex, 1);
+        scannedProducts.unshift(existingProduct);
     } else {
-        scannedProducts.push({
+        // Jika produk baru, tambahkan di paling atas
+        scannedProducts.unshift({
             id: scannedProducts.length + 1,
             title: product.title,
             store: product.store,
@@ -486,6 +495,78 @@ function addProductToScanned(product) {
     compareBtn.disabled = false;
     updateProgress(75, `${scannedProducts.length} produk berhasil di-scan`);
 }
+
+function updateProductList() {
+    productList.innerHTML = '';
+    
+    if (scannedProducts.length === 0) {
+        productList.innerHTML = '<p style="text-align: center; color: #666;">Belum ada barang yang di-scan</p>';
+        return;
+    }
+    
+    scannedProducts.forEach((product, index) => {
+        const productItem = document.createElement('div');
+        productItem.className = 'product-item';
+        
+        // Tambahkan highlight untuk produk terbaru (paling atas)
+        if (index === 0) {
+            productItem.style.borderLeft = '4px solid var(--success)';
+            productItem.style.background = 'rgba(39, 174, 96, 0.05)';
+        }
+        
+        productItem.innerHTML = `
+            <div class="product-info">
+                <div class="product-title">${product.title}</div>
+                <div class="product-sku">SKU: ${product.sku}</div>
+                ${product.barcode ? `<div class="product-barcode">Barcode: ${product.barcode}</div>` : ''}
+                <div class="product-store">Toko: ${product.store}</div>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <span class="product-stock">Stok Sistem: ${product.systemStock}</span>
+                <input type="number" class="product-input" value="${product.scannedCount}" min="0" 
+                    onchange="updateScannedCount('${product.sku}', this.value)">
+                <button class="btn btn-danger" onclick="removeProduct('${product.sku}')" style="margin-left: 10px;">Hapus</button>
+            </div>
+        `;
+        
+        productList.appendChild(productItem);
+    });
+}
+
+function updateScannedCount(sku, value) {
+    const newCount = parseInt(value);
+    const index = scannedProducts.findIndex(item => item.sku === sku);
+    
+    if (index !== -1 && !isNaN(newCount) && newCount >= 0) {
+        scannedProducts[index].scannedCount = newCount;
+        
+        // Pindahkan produk ke atas saat jumlah diupdate
+        const product = scannedProducts[index];
+        scannedProducts.splice(index, 1);
+        scannedProducts.unshift(product);
+        updateProductList();
+    } else {
+        // Reset ke nilai sebelumnya jika input tidak valid
+        updateProductList();
+    }
+}
+
+function removeProduct(sku) {
+    const index = scannedProducts.findIndex(item => item.sku === sku);
+    if (index !== -1) {
+        scannedProducts.splice(index, 1);
+        updateProductList();
+        scannedCount.textContent = scannedProducts.length;
+        
+        if (scannedProducts.length === 0) {
+            compareBtn.disabled = true;
+        }
+        
+        updateProgress(66, `${scannedProducts.length} produk terscan`);
+    }
+}
+
+// ==================== FUNGSI LAIN TETAP SAMA ====================
 
 function handleFileSelect() {
     if (fileInput.files.length > 0) {
@@ -653,59 +734,6 @@ function addScannedProduct() {
     addProductToScanned(product);
     scanInput.value = '';
     scanInput.focus();
-}
-
-function updateProductList() {
-    productList.innerHTML = '';
-    
-    if (scannedProducts.length === 0) {
-        productList.innerHTML = '<p style="text-align: center; color: #666;">Belum ada barang yang di-scan</p>';
-        return;
-    }
-    
-    scannedProducts.forEach((product, index) => {
-        const productItem = document.createElement('div');
-        productItem.className = 'product-item';
-        
-        productItem.innerHTML = `
-            <div class="product-info">
-                <div class="product-title">${product.title}</div>
-                <div class="product-sku">SKU: ${product.sku}</div>
-                ${product.barcode ? `<div class="product-barcode">Barcode: ${product.barcode}</div>` : ''}
-                <div class="product-store">Toko: ${product.store}</div>
-            </div>
-            <div style="display: flex; align-items: center;">
-                <span class="product-stock">Stok Sistem: ${product.systemStock}</span>
-                <input type="number" class="product-input" value="${product.scannedCount}" min="0" 
-                    onchange="updateScannedCount(${index}, this.value)">
-                <button class="btn btn-danger" onclick="removeProduct(${index})" style="margin-left: 10px;">Hapus</button>
-            </div>
-        `;
-        
-        productList.appendChild(productItem);
-    });
-}
-
-function updateScannedCount(index, value) {
-    const newCount = parseInt(value);
-    if (!isNaN(newCount) && newCount >= 0) {
-        scannedProducts[index].scannedCount = newCount;
-    } else {
-        const productItem = document.querySelectorAll('.product-input')[index];
-        productItem.value = scannedProducts[index].scannedCount;
-    }
-}
-
-function removeProduct(index) {
-    scannedProducts.splice(index, 1);
-    updateProductList();
-    scannedCount.textContent = scannedProducts.length;
-    
-    if (scannedProducts.length === 0) {
-        compareBtn.disabled = true;
-    }
-    
-    updateProgress(66, `${scannedProducts.length} produk terscan`);
 }
 
 function showComparison() {
